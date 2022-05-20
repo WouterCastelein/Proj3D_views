@@ -131,3 +131,4 @@ dmypy.json
 # Generated files
 output/
 metrics/
+plots/
