@@ -39,7 +39,6 @@ def plot_3d(proj_file, output_dir='plots', labels=None):
     ax.legend()
     figname = '{0}/{1}.png'.format(output_dir, os.path.basename(proj_file).replace('.csv', ''))
     # rotate the axes and update
-    plt.show()
     fig.savefig(figname)
 
 def plot_2d(proj_file, output_dir='plots', labels=None):

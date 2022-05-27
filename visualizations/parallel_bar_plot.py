@@ -149,7 +149,7 @@ class parallelBarPlot(pg.PlotWidget):
             rect.highlight()
             self.highlighted_rects.append(rect)
         for i, text in enumerate(self.metric_texts):
-            text.setText(F"{constants.metrics[i]}: {round(metric_values[i], 3)}")
+            text.setText(F"{constants.metrics[i]}: {round(metric_values[i], 2)}")
 
     def on_rect_click(self, rect, percentage):
         self.parent.move_to_view(rect.metric_index, rect.bin_index, rect.boundingRect().left(), rect.boundingRect().right(), percentage)

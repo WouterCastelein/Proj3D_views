@@ -37,7 +37,7 @@ def parallel_metrics(X_high, D_high_l, args):
     return [index, T_v, C_v, S_v, N_v]
 
 if __name__ == '__main__':
-    for dataset_name in ['AirQuality']:
+    for dataset_name in ['Software']:
         print(dataset_name)
         input_file = glob(f'data/{dataset_name}/*-src.csv')[0]
 

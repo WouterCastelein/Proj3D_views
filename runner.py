@@ -63,7 +63,8 @@ def get_projections(n_components):
     return projections
 
 if __name__ == '__main__':
-        dataset_name = sys.argv[1]
+        #dataset_name = sys.argv[1]
+    for dataset_name in ['Concrete']:
         selection = sys.argv[2]
 
         input_file = glob('data/{0}/*-src.csv'.format(dataset_name))[0]

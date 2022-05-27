@@ -119,7 +119,7 @@ class Tool(pg.GraphicsWindow):
     def initialize_3d_scatterplot(self):
         proj_file_3d = F"{constants.output_dir}/{self.dataset_name}-{self.projection_method}-3d.csv"
         data = pd.read_csv(proj_file_3d, sep=';').to_numpy()
-        self.scatter_3d = Scatter3D(data, self.labels, parent=self, title="3D projection")
+        self.scatter_3d = Scatter3D(data, self.labels, parent=self, title="3D Projection")
         self.scatter_3d.setBackgroundColor('w')
         self.layoutgb.addWidget(self.scatter_3d, 0, 1)
 
