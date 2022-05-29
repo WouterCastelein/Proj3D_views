@@ -1,3 +1,5 @@
+from PyQt5.QtCore import QRectF
+from PyQt5.QtGui import QPainter, QFont
 from pyqtgraph.Qt import QtGui
 from pyqtgraph.opengl import shaders
 from pyqtgraph.opengl.shaders import ShaderProgram, VertexShader, FragmentShader
@@ -45,12 +47,12 @@ class CustomScatterItem(gl.GLScatterPlotItem):
         ])
 
 class Scatter3D(SyncedCameraViewWidget):
-    def __init__(self, data, labels, parent=None, *args, **kwargs):
+    def __init__(self, data, labels, cmap, parent=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.data = data - (np.max(data) - np.min(data)) / 2 #Center the data around (0,0,0)
         self.labels = labels
         self.parent = parent
-        self.cmap = cm.get_cmap('tab10')
+        self.cmap = cmap
         self.setCameraPosition(distance=1.8)
         self.color = np.empty((data.shape[0], 4))
         if labels is None:
@@ -108,4 +110,23 @@ class Scatter3D(SyncedCameraViewWidget):
         self.scatter_item.setData(pos=self.data[sorted_indices], color=self.color[sorted_indices])
         self.on_view_change()
         self.update_views()
+
+    def paintGL(self):
+        super(Scatter3D, self).paintGL()
+        if type(self.labels) is not None:
+            ulabels = np.unique(self.labels)
+            painter = QPainter(self)
+            font = QFont()
+            font_size = self.deviceHeight() / 30
+            font.setPixelSize(font_size)
+            painter.setFont(font)
+            painter.setPen(pg.mkPen())
+            #painter.drawRect(QRectF(self.deviceWidth() - 80, -1, 81, len(ulabels) * 1.7 * font_size))
+            painter.setPen(pg.mkPen('k'))
+            for i, label in enumerate(ulabels):
+                color = self.cmap(label, bytes=True)
+                painter.setBrush(pg.mkBrush(color))
+                painter.drawEllipse(self.deviceWidth() - 3.5 * font_size, 0.5 * font_size + i * 1.7 * font_size, 0.7 * font_size, 0.7 * font_size)
+                painter.drawText(self.deviceWidth() - 2.0 * font_size, 1.2 * font_size + i * 1.7 * font_size, str(label))
+
 

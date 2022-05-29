@@ -12,6 +12,8 @@ from PyQt5 import QtWidgets, QtGui
 from PyQt5.QtGui import QColor
 from pyqtgraph import mkPen
 
+from matplotlib import cm
+
 import utils
 import constants
 from visualizations.scatter_3d import Scatter3D
@@ -22,42 +24,39 @@ from visualizations.parallel_bar_plot import parallelBarPlot
 class Tool(pg.GraphicsWindow):
     def __init__(self, dataset_name="Concrete", projection_method="TSNE"):
         super(Tool, self).__init__()
+
+        #Setup data
         self.dataset_name = dataset_name
         self.projection_method = projection_method
         metrics_file = os.path.join(constants.metrics_dir, f'metrics_{dataset_name}.pkl')
         df = pd.read_pickle(metrics_file)
         select = df.loc[df['projection_name'] == projection_method]
-
         self.views_metrics = select.iloc[1]['views_metrics'][:, 1:]
         self.metrics_2d = select.iloc[0][constants.metrics].to_numpy()
         self.metrics_3d = select.iloc[1][constants.metrics].to_numpy()
-        self.move_to_view_info = None
-
-        self.setBackground((0, 0, 0, 60))
         self.labels = self.get_labels()
+        self.view_points = np.load(f'spheres/sphere{constants.samples}_points.npy')
+        self.current_metric = 'normalized_stress'
+        self.D_P_dict = self.available_datasets_projections()
+        self.cmap = cm.get_cmap('tab10')
 
+        #Grid initialization
+        self.setBackground((0, 0, 0, 60))
         self.layoutgb = QtWidgets.QGridLayout()
         self.layoutgb.setHorizontalSpacing(1)
         self.layoutgb.setVerticalSpacing(1)
         self.layoutgb.setContentsMargins(1,1,1,1)
-
         self.setLayout(self.layoutgb)
 
-        self.view_points = np.load(f'spheres/sphere{constants.samples}_points.npy')
-
-        self.current_metric = 'normalized_stress'
-        self.D_P_dict = self.available_datasets_projections()
-
+        #Initialize individual widgets
         self.initialize_3d_scatterplot()
         self.initialize_2d_scatterplot()
         self.initialize_sphere()
         self.initialize_histogram()
 
-        self.ci.layout.setContentsMargins(0,0,0,0)
-
-        self.layoutgb.setColumnMinimumWidth(0, 50)
-        self.layoutgb.setColumnStretch(1, 20)
-        self.layoutgb.setColumnStretch(2, 20)
+        self.layoutgb.setColumnStretch(0, 2)
+        self.layoutgb.setColumnStretch(1, 10)
+        self.layoutgb.setColumnStretch(2, 10)
         self.layoutgb.setRowStretch(0, 10)
         self.layoutgb.setRowStretch(1, 10)
 
@@ -84,9 +83,15 @@ class Tool(pg.GraphicsWindow):
 
     def initialize_menu(self):
         keys = list(self.D_P_dict.keys())
-        self.dataset_picker = pg.ComboBox(items=list(self.D_P_dict.keys()), default=self.dataset_name)
-        self.proj_technique_picker = pg.ComboBox(items=list(self.D_P_dict[keys[0]]), default=self.projection_method)
-        self.sphere_metric_picker = pg.ComboBox(items=constants.metrics, default=self.current_metric)
+        datasets = list(self.D_P_dict.keys())
+        datasets.sort()
+        self.dataset_picker = pg.ComboBox(items=datasets, default=self.dataset_name)
+        projections = list(self.D_P_dict[keys[0]])
+        projections.sort()
+        self.proj_technique_picker = pg.ComboBox(items=projections, default=self.projection_method)
+        metrics = list(constants.metrics)
+        metrics.reverse()
+        self.sphere_metric_picker = pg.ComboBox(items=metrics, default=self.current_metric)
 
         self.dataset_picker.currentIndexChanged.connect(self.data_selected)
         self.proj_technique_picker.currentIndexChanged.connect(self.data_selected)
@@ -100,13 +105,13 @@ class Tool(pg.GraphicsWindow):
         self.menu.setPalette(palette)
         self.menu.setAutoFillBackground(True);
 
-
         self.menu.addLabel(text="Dataset:", row=0, col=0)
         self.menu.addWidget(self.dataset_picker, 1, 0)
         self.menu.addLabel(text="Projection Method:", row=2, col=0)
         self.menu.addWidget(self.proj_technique_picker, 3, 0)
         self.menu.addLabel(text="Sphere metric:", row=4, col=0)
         self.menu.addWidget(self.sphere_metric_picker, row=5, col=0)
+
         self.menu.layout.setRowStretch(0, 0)
         self.menu.layout.setRowStretch(1, 0)
         self.menu.layout.setRowStretch(2, 0)
@@ -114,12 +119,12 @@ class Tool(pg.GraphicsWindow):
         self.menu.layout.setRowStretch(4, 0)
         self.menu.layout.setRowStretch(5, 0)
         self.menu.layout.setRowStretch(6, 1)
-        self.layoutgb.addWidget(self.menu, 0, 0, 3, 1)
+        self.layoutgb.addWidget(self.menu, 0, 0, 2, 1)
 
     def initialize_3d_scatterplot(self):
         proj_file_3d = F"{constants.output_dir}/{self.dataset_name}-{self.projection_method}-3d.csv"
         data = pd.read_csv(proj_file_3d, sep=';').to_numpy()
-        self.scatter_3d = Scatter3D(data, self.labels, parent=self, title="3D Projection")
+        self.scatter_3d = Scatter3D(data, self.labels, self.cmap, parent=self, title="3D Projection")
         self.scatter_3d.setBackgroundColor('w')
         self.layoutgb.addWidget(self.scatter_3d, 0, 1)
 
@@ -127,7 +132,7 @@ class Tool(pg.GraphicsWindow):
         # 2D Scatter
         proj_file_2d = F"{constants.output_dir}/{self.dataset_name}-{self.projection_method}-2d.csv"
         df_2d = pd.read_csv(proj_file_2d, sep=';').to_numpy()
-        self.scatter_2d = Scatter2D(df_2d, self.labels)
+        self.scatter_2d = Scatter2D(df_2d, self.labels, self.cmap)
         self.layoutgb.addWidget(self.scatter_2d, 0, 2)
         self.scatter_2d.setBackground('w')
 
@@ -136,9 +141,9 @@ class Tool(pg.GraphicsWindow):
 
         c = ["darkred", "red", "yellow", "green", "darkgreen"]
         v = [ 0, 0.2, 0.5, 0.8, 1]
-        self.cmap = pg.ColorMap(v, c)
+        self.heatmap = pg.ColorMap(v, c)
 
-        self.sphere = QualitySphere(self.sphere_data, self.cmap, parent=self, title=F"Viewpoint quality ({self.current_metric})")
+        self.sphere = QualitySphere(self.sphere_data, self.heatmap, parent=self, title=F"Viewpoint quality ({self.current_metric})")
         self.sphere.setBackgroundColor('w')
 
         self.sphere_widget = pg.LayoutWidget()
@@ -147,13 +152,13 @@ class Tool(pg.GraphicsWindow):
         self.sphere_widget.layout.setHorizontalSpacing(0)
 
         self.cbw = pg.GraphicsLayoutWidget()
-        self.color_bar = pg.ColorBarItem(colorMap=self.cmap, interactive=False, values=(0, 1))
+        self.color_bar = pg.ColorBarItem(colorMap=self.heatmap, interactive=False, values=(0, 1))
         self.color_bar_line = self.color_bar.addLine(y=255, pen=mkPen(0,0,0,255))
         self.cbw.addItem(self.color_bar)
         self.cbw.setBackground('w')
         self.sphere_widget.addWidget(self.cbw, 0, 1)
-        self.sphere_widget.layout.setColumnStretch(1, 2)
-        self.sphere_widget.layout.setColumnStretch(0, 8)
+        self.sphere_widget.layout.setColumnStretch(1, 1)
+        self.sphere_widget.layout.setColumnStretch(0, 12)
 
         self.cbw.setSizePolicy(self.sphere.sizePolicy())
         self.layoutgb.addWidget(self.sphere_widget, 1, 1)

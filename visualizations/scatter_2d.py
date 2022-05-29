@@ -9,13 +9,13 @@ from pyqtgraph import LabelItem
 
 
 class Scatter2D(pg.PlotWidget):
-    def __init__(self, data, labels, title="2D Projection", *args, **kwargs):
+    def __init__(self, data, labels, cmap, title="2D Projection", *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.hideAxis('left')
         self.hideAxis('bottom')
         self.setAspectLocked()
         padding = 0.02
-        self.cmap = cm.get_cmap('tab10')
+        self.cmap = cmap
         self.scatter_item = pg.ScatterPlotItem(size=5, pen=pg.mkPen(0,0,0,50), hoverable=True)
         self.getViewBox().setLimits(xMin=-2, xMax=2, yMin=np.min(data[:, 1]) - padding, yMax=np.max(data[:, 1]) + padding)
         if labels is None:
@@ -26,7 +26,6 @@ class Scatter2D(pg.PlotWidget):
         self.addItem(self.scatter_item)
         self.title = title
         self.label = QLabel(self.title, self.viewport())
-        #self.label.baseSize()
 
     def set_data(self, data, labels):
         if labels is None:
