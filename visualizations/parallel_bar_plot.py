@@ -52,6 +52,26 @@ class InteractiveRect(QtWidgets.QGraphicsRectItem):
         color.setAlpha(255 * 0.7)
         self.setBrush(pg.mkBrush(color))
 
+class ClickableText(pg.TextItem):
+    def __init__(self, parent, text="metric", *args, **kwargs):
+        super(ClickableText, self).__init__(text=text, *args, **kwargs)
+        self.setAcceptHoverEvents(True)
+        self.parent = parent
+        self.metric = text
+
+    def hoverEnterEvent(self, event):
+        c = self.color
+        c.setAlpha(255)
+        self.setColor(c)
+
+    def hoverLeaveEvent(self, event):
+        c = self.color
+        c.setAlpha(0.7 * 255)
+        self.setColor(c)
+
+    def mousePressEvent(self, event):
+        self.parent.on_metric_click(self.metric)
+
 class parallelBarPlot(pg.PlotWidget):
     h_gap = 1.4 #Distance between histogram plots in local coordinates
     nr_bins = 40
@@ -67,6 +87,9 @@ class parallelBarPlot(pg.PlotWidget):
         self.label = QLabel(self.title, self.viewport())
         self.cmap = cm.get_cmap('tab10')
         self.max_points_in_bin = 0 #Defined later, and used to determine where to draw the polylines on hover
+        self.lock = False
+        if constants.user_mode == 'eval_half':
+            self.setVisible(False)
 
         #References to the poyline objects
         self.lines = None
@@ -97,10 +120,10 @@ class parallelBarPlot(pg.PlotWidget):
         #Write metric names in the top left corner of each histogram
         for metric in range(len(self.histograms)):
             text = constants.metrics[metric]
-            item = pg.TextItem(text=text, anchor=(0, 0.5), color=pg.mkColor(self.cmap(metric, bytes=True, alpha=0.7)))
+            item = ClickableText(self, text=text, anchor=(0, 0.5), color=pg.mkColor(self.cmap(metric, bytes=True, alpha=0.7)))
             self.metric_texts.append(item)
             x = self.x_range[0]
-            y = self.h_gap * metric + 0.8
+            y = self.h_gap * metric + 1.1
             item.setPos(x, y)
             self.addItem(item)
 
@@ -127,16 +150,17 @@ class parallelBarPlot(pg.PlotWidget):
                 self.addItem(rect)
                 self.rect_reference[constants.metrics[h_index]].append(rect)
 
-            #Add markers fot the quality of the 2D and 3D projection
-            line2D = QtWidgets.QGraphicsLineItem(self.metrics2d[h_index], self.h_gap * h_index -0.02, self.metrics2d[h_index],
-                                                 self.h_gap * h_index - 0.10)
-            line2D.setPen(pg.mkPen(color, width=4))
-            self.addItem(line2D)
+            if constants.user_mode == 'free':
+                #Add markers fot the quality of the 2D and 3D projection
+                line2D = QtWidgets.QGraphicsLineItem(self.metrics2d[h_index], self.h_gap * h_index -0.02, self.metrics2d[h_index],
+                                                     self.h_gap * h_index - 0.10)
+                line2D.setPen(pg.mkPen(color, width=4))
+                self.addItem(line2D)
 
-            line3D = QtWidgets.QGraphicsLineItem(self.metrics3d[h_index], self.h_gap * h_index -0.02, self.metrics3d[h_index],
-                                                 self.h_gap * h_index - 0.2)
-            line3D.setPen(pg.mkPen(color, width=4))
-            self.addItem(line3D)
+                line3D = QtWidgets.QGraphicsLineItem(self.metrics3d[h_index], self.h_gap * h_index -0.02, self.metrics3d[h_index],
+                                                     self.h_gap * h_index - 0.2)
+                line3D.setPen(pg.mkPen(color, width=4))
+                self.addItem(line3D)
 
             self.draw_axis(h_index, (self.x_range[0], h_index * self.h_gap), (self.x_range[1], h_index * self.h_gap), 11)
 
@@ -152,8 +176,12 @@ class parallelBarPlot(pg.PlotWidget):
             text.setText(F"{constants.metrics[i]}: {round(metric_values[i], 2)}")
 
     def on_rect_click(self, rect, percentage):
+        if self.lock:
+            return
         self.parent.move_to_view(rect.metric_index, rect.bin_index, rect.boundingRect().left(), rect.boundingRect().right(), percentage)
 
+    def on_metric_click(self, metric):
+        self.parent.metric_selected(metric)
 
     def draw_axis(self, h_index, p_bottom_left, p_bottom_right,ticks):
         """"
@@ -185,6 +213,8 @@ class parallelBarPlot(pg.PlotWidget):
         indices : Tuple(number, number)
             The index of the currently hovered histogram/metric and the index of the specific bin that is hovered
         """
+        if self.lock:
+            return
         #unwrap indices
         h_index, b_index = indices
 

@@ -1,12 +1,11 @@
-from pyqtgraph.opengl import shaders
+from PyQt5.QtGui import QPainter
+import pyqtgraph as pg
 from pyqtgraph.opengl.shaders import ShaderProgram, VertexShader, FragmentShader
 
 from visualizations.synced_camera_view_widget import SyncedCameraViewWidget
 import constants
 import numpy as np
 import pyqtgraph.opengl as gl
-from scipy.spatial import ConvexHull
-
 
 class CustomMeshItem(gl.GLMeshItem):
     def __init__(self, texture_map, *args, **kwargs):
@@ -55,9 +54,10 @@ class CustomMeshItem(gl.GLMeshItem):
 class QualitySphere(SyncedCameraViewWidget):
     def __init__(self, data, cmap, parent=None, *args, **kwargs, ):
         super().__init__(*args, **kwargs)
+
         self.data = data
         self.parent = parent
-        self.setCameraPosition(distance=5)
+        self.setCameraPosition(distance=250)
         vertices = np.load(f'spheres/sphere{constants.samples}_points.npy')
         faces = np.load(f'spheres/sphere{constants.samples}_faces.npy')
         self.cmap = cmap
@@ -73,19 +73,13 @@ class QualitySphere(SyncedCameraViewWidget):
         self.mesh_item = CustomMeshItem(texture_1d, meshdata=self.md, smooth=True, shader='custom_shader', glOptions='translucent')
         self.addItem(self.mesh_item)
 
-        #Add white dot on the current viewpoint:
-        eye = self.cameraPosition()
-        eye.normalize()
-        self.scatter_item = gl.GLScatterPlotItem(pos=eye, size=5, color=(1,1,1, 1),
-                                                 pxMode=True)
-        self.scatter_item.setGLOptions('translucent')
-        self.addItem(self.scatter_item)
+    def paintGL(self):
+        super(QualitySphere, self).paintGL()
 
-    def on_view_change(self):
-        super(QualitySphere, self).on_view_change()
-        self.draw_crosshair()
-
-    def draw_crosshair(self):
-        eye = self.cameraPosition()
-        eye.normalize()
-        self.scatter_item.setData(pos=eye)
+        #Draw crosshair
+        painter = QPainter(self)
+        painter.setPen(pg.mkPen('k'))
+        painter.setBrush(pg.mkBrush('k'))
+        painter.drawLine(self.deviceWidth() / 2 -3, self.deviceHeight() / 2, self.deviceWidth() / 2 +3, self.deviceHeight() / 2)
+        painter.drawLine(self.deviceWidth() / 2 +0.5, self.deviceHeight() / 2 -3, self.deviceWidth() / 2 +0.5,
+                         self.deviceHeight() / 2 + 3)

@@ -142,7 +142,7 @@ if __name__ == '__main__':
 
     save_sphere_mesh(samples=constants.samples)
     viewpoints = np.load(f'spheres/sphere{constants.samples}_points.npy')
-    for proj_file in projections_3d:
+    for proj_file in projections_3d[10:]:
         dataset_name = os.path.basename(proj_file).split('-')[0]
         label_file = glob('data/{0}/*-labels.csv'.format(dataset_name))
 
@@ -152,6 +152,6 @@ if __name__ == '__main__':
         else:
             labels = None
 
-        compute_views(proj_file, viewpoints, labels=labels, display=False, manual_rotate=False)
+        compute_views(proj_file, viewpoints, labels=labels, display=False, manual_rotate=True)
     pass
 

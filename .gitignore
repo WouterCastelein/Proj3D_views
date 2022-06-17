@@ -129,6 +129,6 @@ dmypy.json
 .pyre/
 
 # Generated files
-output/
+projections/
 metrics/
 plots/
