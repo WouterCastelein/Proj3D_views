@@ -189,7 +189,6 @@ class Tool(pg.GraphicsWindow):
         self.selected_counter.setText(f"{self.selected_view_count()}/{constants.required_view_count} views selected")
 
     def select_preference(self, preference):
-        self.next_button.setDisabled(False)
         self.preference_label.setVisible(False)
         self.prefer_3d.setVisible(False)
         self.prefer_2d.setVisible(False)
@@ -204,6 +203,8 @@ class Tool(pg.GraphicsWindow):
             'preference': preference,
             'mode': constants.user_mode,
         })
+        if self.selected_view_count() >= 3:
+            self.next_button.setDisabled(False)
         self.check_select_available()
         self.update_selected_count_text()
 

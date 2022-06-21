@@ -4,3 +4,4 @@ import pickle
 
 with open('evaluationdata.pkl', 'rb') as file:
     a = pickle.load(file)
+    print(a)

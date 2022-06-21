@@ -54,6 +54,7 @@ class Scatter3D(SyncedCameraViewWidget):
         self.parent = parent
         self.cmap = cmap
         self.iscategorical = iscategorical
+        self.opts['distance'] = 110
         #self.setCameraPosition(distance=1.8)
         self.color = np.empty((data.shape[0], 4))
         if labels is None:

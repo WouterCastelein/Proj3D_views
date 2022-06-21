@@ -19,10 +19,7 @@ class SyncedCameraViewWidget(gl.GLViewWidget):
 
     def wheelEvent(self, ev):
         """Update view on zoom event"""
-        if self.lock:
-            return
-        super().wheelEvent(ev)
-        self.update_views()
+        return
 
     def mouseMoveEvent(self, ev):
         """Update view on move event"""

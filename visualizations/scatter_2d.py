@@ -16,6 +16,7 @@ class Scatter2D(pg.PlotWidget):
         self.hideAxis('left')
         self.hideAxis('bottom')
         self.setAspectLocked()
+        self.setMouseEnabled(x=False, y=False)
         padding = 0.3
         self.cmap = cmap
         self.iscategorical = iscategorical
