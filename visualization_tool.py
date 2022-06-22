@@ -7,6 +7,7 @@ import os
 import numpy as np
 import pandas as pd
 import pickle
+import keyboard
 
 import pyqtgraph as pg
 from PyQt5 import QtWidgets, QtGui
@@ -27,6 +28,8 @@ from functools import partial
 class Tool(pg.GraphicsWindow):
     def __init__(self, dataset_name="Concrete", projection_method="TSNE"):
         super(Tool, self).__init__()
+
+        keyboard.on_press(self.keyboard_event)
 
         #Setup data
         self.dataset_name = dataset_name
@@ -132,14 +135,6 @@ class Tool(pg.GraphicsWindow):
             self.prefer_3d.setVisible(False)
             self.prefer_2d.setVisible(False)
 
-        # if constants.user_mode != 'eval_half':
-        #     metrics = list(constants.metrics)
-        #     metrics.reverse()
-        #     self.sphere_metric_picker = pg.ComboBox(items=metrics, default=self.current_metric)
-        #     self.sphere_metric_picker.currentIndexChanged.connect(self.metric_selected)
-        #     self.menu.addLabel(text="Sphere metric:", row=len(self.menu.rows), col=0)
-        #     self.menu.addWidget(self.sphere_metric_picker, row=len(self.menu.rows), col=0)
-
         for i in range(len(self.menu.rows) - 1):
             self.menu.layout.setRowStretch(i, 0)
         self.menu.layout.setRowStretch(len(self.menu.rows), 1)
@@ -167,8 +162,6 @@ class Tool(pg.GraphicsWindow):
                 self.set_tool_lock(False)
                 self.next_button.setDisabled(True)
                 self.update_selected_count_text()
-
-
             else:
                 with open(constants.output_file, 'wb') as file:
                     pickle.dump(self.evaluation_data, file)
@@ -350,11 +343,17 @@ class Tool(pg.GraphicsWindow):
             indices = np.argwhere(np.logical_and(a >= metric_value_l, a <= metric_value_r)).flatten()
             indices = indices[np.argsort(self.views_metrics[indices, metric_index])]
             index = indices[round((len(indices) - 1) * percentage)]
-            viewpoint = utils.rectangular_to_spherical(np.array([self.view_points[index]]))[0]
-            self.sphere.setCameraPosition(azimuth=viewpoint[1], elevation=viewpoint[0], distance=self.sphere.cameraParams()['distance'])
-            self.scatter_3d.setCameraPosition(azimuth=viewpoint[1], elevation=viewpoint[0], distance=self.scatter_3d.cameraParams()['distance'])
-            self.sphere.update_views()
-            self.scatter_3d.update_order()
+            viewpoint = np.array([self.view_points[index]])
+            self.move_to_viewpoint(viewpoint)
+
+    def move_to_viewpoint(self, viewpoint):
+        viewpoint_spherical = utils.rectangular_to_spherical(np.array([viewpoint]))[0]
+        self.sphere.setCameraPosition(azimuth=viewpoint_spherical[1], elevation=viewpoint_spherical[0],
+                                      distance=self.sphere.cameraParams()['distance'])
+        self.scatter_3d.setCameraPosition(azimuth=viewpoint_spherical[1], elevation=viewpoint_spherical[0],
+                                          distance=self.scatter_3d.cameraParams()['distance'])
+        self.sphere.update_views()
+        self.scatter_3d.update_order()
 
     def data_selected(self):
         dataset_name = self.dataset_picker.value()
@@ -395,6 +394,16 @@ class Tool(pg.GraphicsWindow):
         self.initialize_histogram()
         self.initialize_sphere()
         self.highlight()
+
+    def set_analysis_data(self, data):
+        self.analysis_data = data
+
+    def keyboard_event(self, event):
+        if event.event_type == 'down':
+            if event.name == '1':
+                vp = self.analysis_data[0][0]['viewpoint']
+                self.move_to_viewpoint(vp)
+                print('w')
 
 
 
