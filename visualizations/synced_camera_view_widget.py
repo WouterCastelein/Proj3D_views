@@ -21,6 +21,10 @@ class SyncedCameraViewWidget(gl.GLViewWidget):
         """Update view on zoom event"""
         return
 
+    def pan(self, dx, dy, dz, relative='global'):
+        #disable panning
+        return
+
     def mouseMoveEvent(self, ev):
         """Update view on move event"""
         if self.lock:
