@@ -47,6 +47,7 @@ class Scatter2D(pg.PlotWidget):
                 m = max(labels)
                 colors = [pg.mkBrush(self.cmap(labels[i] / m, bytes=True)) for i in range(data.shape[0])]
         self.scatter_item.setData(pos=data, brush=colors, size=5, pen=pg.mkPen(0,0,0,50))
+        self.setMouseEnabled(x=False, y=False)
 
     def paintEvent(self, ev):
         super().paintEvent(ev)
