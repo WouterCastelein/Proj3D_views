@@ -36,7 +36,7 @@ if __name__ == '__main__':
     input_file = glob('CAG/{0}/*-src.csv'.format(dataset_name))[0]
 
     metrics_file = 'CAG/metrics_{0}.csv'.format(dataset_name)
-    output_dir = 'CAG/output'
+    output_dir = 'CAG/projections'
 
     df = pd.read_csv(input_file, sep=';', header=0)
     X_high = df.to_numpy()

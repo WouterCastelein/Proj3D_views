@@ -1,3 +1,4 @@
+from OpenGL.raw.GL.VERSION.GL_1_0 import glClearColor
 from PyQt5.QtGui import QPainter
 import pyqtgraph as pg
 from pyqtgraph.opengl.shaders import ShaderProgram, VertexShader, FragmentShader
@@ -74,6 +75,8 @@ class QualitySphere(SyncedCameraViewWidget):
         self.addItem(self.mesh_item)
 
     def paintGL(self):
+        if constants.user_mode == 'eval_half':
+            self.setWindowOpacity(0)
         super(QualitySphere, self).paintGL()
 
         #Draw crosshair

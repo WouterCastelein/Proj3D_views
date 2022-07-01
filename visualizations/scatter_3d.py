@@ -4,6 +4,7 @@ from pyqtgraph.Qt import QtGui
 from pyqtgraph.opengl import shaders
 from pyqtgraph.opengl.shaders import ShaderProgram, VertexShader, FragmentShader
 
+import constants
 from visualizations.synced_camera_view_widget import SyncedCameraViewWidget
 import pyqtgraph.opengl as gl
 from matplotlib import cm

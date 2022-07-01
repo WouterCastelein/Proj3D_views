@@ -12,4 +12,5 @@ if __name__ == '__main__':
 
     #start tool
     win = visualization_tool.Tool()
+    win.showMaximized()
     pg.exec()

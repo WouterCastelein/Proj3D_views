@@ -49,6 +49,7 @@ class Tool(pg.GraphicsWindow):
         self.layoutgb.setColumnStretch(2, 10)
         self.layoutgb.setRowStretch(0, 10)
         self.layoutgb.setRowStretch(1, 10)
+        self.sphere_widgets = []
 
 
         if constants.user_mode != 'free':
@@ -151,6 +152,7 @@ class Tool(pg.GraphicsWindow):
             constants.user_mode = 'eval_half'
             self.sphere_widget.setVisible(False)
             self.hist.setVisible(False)
+            self.sphere_widget.setVisible(False)
 
         if constants.user_mode != 'free':
             self.projection_index += 1
@@ -207,7 +209,6 @@ class Tool(pg.GraphicsWindow):
             self.select_button.setText('Deselect view')
         else:
             self.select_button.setText('Select view')
-        self.scatter_2d.getViewBox().setMouseEnabled(x=not self.view_locked, y=not self.view_locked)
         self.hist.lock = self.view_locked
         self.scatter_3d.lock = self.view_locked
         self.sphere.lock = self.view_locked
@@ -271,8 +272,10 @@ class Tool(pg.GraphicsWindow):
 
         self.scatter_3d.sync_camera_with(self.sphere)
         self.sphere.sync_camera_with(self.scatter_3d)
+        self.sphere_widgets.append(self.sphere_widget)
         if constants.user_mode == 'eval_half':
-            self.sphere_widget.setVisible(False)
+            for widget in self.sphere_widgets:
+                widget.setVisible(False)
 
     def initialize_histogram(self):
         self.hist = parallelBarPlot(self.views_metrics, self.metrics_2d, self.metrics_3d, self.view_points, parent=self)
@@ -393,6 +396,7 @@ class Tool(pg.GraphicsWindow):
 
         self.initialize_histogram()
         self.initialize_sphere()
+        self.scatter_3d.update_views()
         self.highlight()
 
     def set_analysis_data(self, data):
