@@ -5,6 +5,8 @@ from matplotlib import cm
 from pyqtgraph import mkPen, mkBrush
 from PyQt5.QtGui import QColor, QFont
 import numpy as np
+from pyqtgraph.Qt import QtGui
+
 import constants
 import math
 
@@ -72,12 +74,45 @@ class ClickableText(pg.TextItem):
     def mousePressEvent(self, event):
         self.parent.on_metric_click(self.metric)
 
+class boxPlot(pg.GraphicsObject):
+    def __init__(self, avg, std, min, max, height, v_pos):
+        super(boxPlot, self).__init__()
+        self.avg = avg
+        self.std = std
+        self.min = min
+        self.max = max
+        self.height = height
+        self.v_pos = v_pos
+        self.generatePicture()
+
+    def generatePicture(self):
+        self.picture = QtGui.QPicture()
+        p = QtGui.QPainter(self.picture)
+        p.setPen(pg.mkPen('r', width=2))
+        #p.drawLine(self.max, self.v_pos, self.min, self.v_pos)
+        p.setPen(pg.mkPen('k', width=1))
+        p.drawLine(0.5, 0, 0.5, 5)
+        p.drawLine(0.41, 0.87, 1, 5.5)
+        p.drawLine(0.8, 0.87, 1, 5.5)
+        p.drawLine(1, 0.87, 1, 5.5)
+
+        p.end()
+
+    def paint(self, p, *args):
+        p.drawPicture(0, 0, self.picture)
+
+    def boundingRect(self):
+        return QtCore.QRectF(self.picture.boundingRect())
+
+
 class parallelBarPlot(pg.PlotWidget):
     h_gap = 1.4 #Distance between histogram plots in local coordinates
     nr_bins = 40
 
     def __init__(self, views_metrics, metrics2d, metrics3d, view_points, parent=None, title="Viewpoint quality histogram", *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if constants.user_mode == 'evalimage':
+            self.h_gap *= 2
         self.views_metrics = views_metrics
         self.metrics2d = metrics2d
         self.metrics3d = metrics3d
@@ -118,14 +153,15 @@ class parallelBarPlot(pg.PlotWidget):
         self.getViewBox().setMouseEnabled(x=False, y=False)
 
         #Write metric names in the top left corner of each histogram
-        for metric in range(len(self.histograms)):
-            text = constants.metrics[metric]
-            item = ClickableText(self, text=text, anchor=(0, 0.5), color=pg.mkColor(self.cmap(metric, bytes=True, alpha=0.7)))
-            self.metric_texts.append(item)
-            x = self.x_range[0]
-            y = self.h_gap * metric + 1.1
-            item.setPos(x, y)
-            self.addItem(item)
+        if constants.user_mode != "image":
+            for metric in range(len(self.histograms)):
+                text = constants.metrics[metric]
+                item = ClickableText(self, text=text, anchor=(0, 0.5), color=pg.mkColor(self.cmap(metric, bytes=True, alpha=0.7)))
+                self.metric_texts.append(item)
+                x = self.x_range[0]
+                y = self.h_gap * metric + 1.1
+                item.setPos(x, y)
+                self.addItem(item)
 
     def draw_histograms(self):
         self.rect_reference = {}
@@ -164,7 +200,15 @@ class parallelBarPlot(pg.PlotWidget):
 
             self.draw_axis(h_index, (self.x_range[0], h_index * self.h_gap), (self.x_range[1], h_index * self.h_gap), 11)
 
+    def draw_box_plots(self):
+        avg_users, std_users, min_users, max_users, avg_overall, std_overall, min_overall, max_overall = self.parent.get_boxplot_data()
+        for i, metric in enumerate(constants.metrics):
+            bplot_users = boxPlot(avg_users[i], std_users[i], min_users[i], max_users[i], 1, self.h_gap * i - 0.5)
+            self.addItem(bplot_users)
+
     def highlight_bar_with_values(self, metric_values):
+        if constants.user_mode in ['image', 'evalimage']:
+            return
         for rect in self.highlighted_rects:
             rect.un_highlight()
         for h_index, value in enumerate(metric_values):
@@ -176,7 +220,7 @@ class parallelBarPlot(pg.PlotWidget):
             text.setText(F"{constants.metrics[i]}: {round(metric_values[i], 2)}")
 
     def on_rect_click(self, rect, percentage):
-        if self.lock:
+        if self.lock or constants.user_mode == 'evalimage':
             return
         self.parent.move_to_view(rect.metric_index, rect.bin_index, rect.boundingRect().left(), rect.boundingRect().right(), percentage)
 

@@ -16,6 +16,7 @@ class SyncedCameraViewWidget(gl.GLViewWidget):
         self.lock = False
         self.opts['distance'] = 100
         self.opts['fov'] = 1
+        self.opts['elevation'] = 0
 
     def wheelEvent(self, ev):
         """Update view on zoom event"""

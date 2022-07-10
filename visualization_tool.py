@@ -8,12 +8,14 @@ import numpy as np
 import pandas as pd
 import pickle
 import keyboard
+import time
 
 import pyqtgraph as pg
-from PyQt5 import QtWidgets, QtGui
+from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QPushButton
 from pyqtgraph import mkPen
+import pyqtgraph.exporters
 
 from matplotlib import cm
 
@@ -26,7 +28,7 @@ from visualizations.parallel_bar_plot import parallelBarPlot
 from functools import partial
 
 class Tool(pg.GraphicsWindow):
-    def __init__(self, dataset_name="Concrete", projection_method="TSNE"):
+    def __init__(self, dataset_name="Concrete", projection_method="TSNE", analysis_data=None):
         super(Tool, self).__init__()
 
         keyboard.on_press(self.keyboard_event)
@@ -51,6 +53,7 @@ class Tool(pg.GraphicsWindow):
         self.layoutgb.setRowStretch(1, 10)
         self.sphere_widgets = []
 
+        self.analysis_data = analysis_data
 
         if constants.user_mode != 'free':
             self.projection_index = 0
@@ -62,6 +65,7 @@ class Tool(pg.GraphicsWindow):
         self.initialize_menu()
         self.scatter_2d = None
         self.scatter_3d = None
+
         self.set_data(self.dataset_name, self.projection_method)
 
         self.highlight()
@@ -229,6 +233,8 @@ class Tool(pg.GraphicsWindow):
 
     def initialize_2d_scatterplot(self):
         # 2D Scatter
+        if constants.user_mode == 'evalimage':
+            return
         proj_file_2d = F"{constants.output_dir}/{self.dataset_name}-{self.projection_method}-2d.csv"
         df_2d = pd.read_csv(proj_file_2d, sep=';').to_numpy()
         if self.scatter_2d is None:
@@ -280,7 +286,10 @@ class Tool(pg.GraphicsWindow):
     def initialize_histogram(self):
         self.hist = parallelBarPlot(self.views_metrics, self.metrics_2d, self.metrics_3d, self.view_points, parent=self)
         self.hist.setBackground('w')
-        self.layoutgb.addWidget(self.hist, 1, 2)
+        if constants.user_mode == 'evalimage':
+            self.layoutgb.addWidget(self.hist, 0, 2, 2, 1)
+        else:
+            self.layoutgb.addWidget(self.hist, 1, 2)
 
     def current_quality(self):
         eye = self.sphere.cameraPosition()
@@ -346,7 +355,7 @@ class Tool(pg.GraphicsWindow):
             indices = np.argwhere(np.logical_and(a >= metric_value_l, a <= metric_value_r)).flatten()
             indices = indices[np.argsort(self.views_metrics[indices, metric_index])]
             index = indices[round((len(indices) - 1) * percentage)]
-            viewpoint = np.array([self.view_points[index]])
+            viewpoint = np.array(self.view_points[index])
             self.move_to_viewpoint(viewpoint)
 
     def move_to_viewpoint(self, viewpoint):
@@ -399,15 +408,64 @@ class Tool(pg.GraphicsWindow):
         self.scatter_3d.update_views()
         self.highlight()
 
-    def set_analysis_data(self, data):
-        self.analysis_data = data
-
     def keyboard_event(self, event):
         if event.event_type == 'down':
             if event.name == '1':
-                vp = self.analysis_data[0][0]['viewpoint']
+                vp = self.analysis_data['viewpoint'][0]
                 self.move_to_viewpoint(vp)
                 print('w')
+
+    def indices(self, di, pi):
+        pi += 1
+        if pi == 5:
+            di += 1
+            pi = 0
+        return di, pi
+
+    def save_image(self, dataset, projection):
+        exporter = pg.exporters.ImageExporter(self.hist.scene())
+        exporter.export(f'{constants.analysis_dir}/{dataset}-{projection}-histograms.png')
+        for metric in constants.metrics:
+            self.metric_selected(metric)
+            self.sphere.readQImage().save(f"{constants.analysis_dir}/{dataset}-{projection}-{metric}-sphere1.png")
+            self.move_to_viewpoint(-np.array(self.sphere.cameraPosition()))
+            self.sphere.readQImage().save(f"{constants.analysis_dir}/{dataset}-{projection}-{metric}-sphere2.png")
+
+        # QtCore.QTimer.singleShot(100, lambda: self.sphere.readQImage().save(
+        #     f"{constants.analysis_dir}/{dataset}-{projection}-sphere1.png"))
+        # QtCore.QTimer.singleShot(200, lambda: self.move_to_viewpoint(-np.array(self.sphere.cameraPosition())))
+        # QtCore.QTimer.singleShot(300, lambda: self.sphere.readQImage().save(
+        #     f"{constants.analysis_dir}/{dataset}-{projection}-sphere2.png"))
+    def save_images(self, tuple):
+        di, pi = tuple
+        configs = self.available_datasets_projections()
+        dataset = list(configs.keys())[di]
+        projection = list(configs[dataset])[pi]
+        QtCore.QTimer.singleShot(100, lambda: self.set_data(dataset, projection))
+        QtCore.QTimer.singleShot(200, lambda: self.save_image(dataset, projection))
+        QtCore.QTimer.singleShot(300, lambda: self.save_images(self.indices(di, pi)))
+
+    def get_boxplot_data(self):
+        data = self.analysis_data[(self.analysis_data['dataset'] == self.dataset_name) &
+                                  (self.analysis_data['projection_method'] == self.projection_method)]
+        qualities = np.array([l for l in data['view_quality']])
+        avg_users = qualities.mean(axis=0)
+        std_users = qualities.std(axis=0)
+        min_users = qualities.min(axis=0)
+        max_users = qualities.max(axis=0)
+
+        avg_overall = self.views_metrics.mean(axis=0)
+        std_overall = self.views_metrics.std(axis=0)
+        min_overall = self.views_metrics.min(axis=0)
+        max_overall = self.views_metrics.max(axis=0)
+        return avg_users, std_users, min_users, max_users, avg_overall, std_overall, min_overall, max_overall
+
+    def box_plot_images(self):
+        for config in constants.evaluation_set[1:]:
+            self.set_data(config[0], config[1])
+            self.hist.draw_box_plots()
+            return
+            # save images
 
 
 

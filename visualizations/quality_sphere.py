@@ -1,4 +1,5 @@
 from OpenGL.raw.GL.VERSION.GL_1_0 import glClearColor
+from PyQt5 import QtCore
 from PyQt5.QtGui import QPainter
 import pyqtgraph as pg
 from pyqtgraph.opengl.shaders import ShaderProgram, VertexShader, FragmentShader
@@ -86,3 +87,6 @@ class QualitySphere(SyncedCameraViewWidget):
         painter.drawLine(self.deviceWidth() / 2 -3, self.deviceHeight() / 2, self.deviceWidth() / 2 +3, self.deviceHeight() / 2)
         painter.drawLine(self.deviceWidth() / 2 +0.5, self.deviceHeight() / 2 -3, self.deviceWidth() / 2 +0.5,
                          self.deviceHeight() / 2 + 3)
+
+    def save_image(self):
+        QtCore.QTimer.singleShot(1000, lambda: self.readQImage().save("fileName.png"))

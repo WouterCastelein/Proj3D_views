@@ -126,7 +126,7 @@ class Scatter3D(SyncedCameraViewWidget):
 
     def paintGL(self):
         super(Scatter3D, self).paintGL()
-        if type(self.labels) is not None:
+        if self.labels is not None:
             ulabels = np.unique(self.labels)
             painter = QPainter(self)
             font = QFont()
