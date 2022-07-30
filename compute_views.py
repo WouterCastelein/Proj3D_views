@@ -10,7 +10,7 @@ import trimesh
 import constants
 import utils
 
-def compute_views(proj_file, viewpoints, labels=None, display=True, manual_rotate=False):
+def compute_views(proj_file, viewpoints, labels=None, display=False, manual_rotate=False):
     cmap = plt.get_cmap('tab10')
 
     df = pd.read_csv(proj_file, sep=';', header=0)
@@ -52,12 +52,14 @@ def compute_views(proj_file, viewpoints, labels=None, display=True, manual_rotat
         elev, azim = None, None
         while True:
             if elev != ax.elev or azim != ax.azim:
+                ax.view_init(0, 0)
                 view_proj.clear()
                 #Update the 2D view scatterplot if the view of the 3D projection changes
                 view = proj_view(df, np.linalg.inv(ax.get_proj()))
                 eye = ax.eye
                 update_view(view_proj, view, cmap, df, eye, fig2)
-            plt.pause(.01)
+
+            plt.pause(0.01)
     else:
         views = []
         #Loop over all viewpoints, save the resulting 2D view and optionally display the view in a plot.
@@ -84,8 +86,8 @@ def proj_view(df, matrix):
     view = np.matmul(projection, matrix)[:, 0:2]
 
     #Scale exactly to the range (0, 1)
-    view -= np.min(view)
-    view /= max(np.max(view), -np.min(view))
+    view -= np.min(view, axis=0)
+    view /= np.max(view)
     return view
 
 def update_view(ax, view, cmap, df, eye, fig):
@@ -140,7 +142,7 @@ def save_sphere_mesh(samples=1000):
 if __name__ == '__main__':
     projections_3d = glob(os.path.join(constants.output_dir, '*3d.csv'))
 
-    save_sphere_mesh(samples=constants.samples)
+    #save_sphere_mesh(samples=constants.samples)
     viewpoints = np.load(f'spheres/sphere{constants.samples}_points.npy')
     for proj_file in projections_3d[10:]:
         dataset_name = os.path.basename(proj_file).split('-')[0]
@@ -152,6 +154,6 @@ if __name__ == '__main__':
         else:
             labels = None
 
-        compute_views(proj_file, viewpoints, labels=labels, display=False, manual_rotate=True)
+        compute_views(proj_file, viewpoints, labels=labels, display=False, manual_rotate=False)
     pass
 

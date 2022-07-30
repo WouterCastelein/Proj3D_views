@@ -6,8 +6,9 @@ hover_to_view = True #Toggle for switching views by either hovering over bars, o
 metrics_dir = 'metrics'
 output_dir = 'projections'
 analysis_dir = 'analysis'
+use0_1bounds = False
 user_modes = ['free', 'eval_full', 'eval_half', 'image', 'evalimage']
-user_mode = 'evalimage'
+user_mode = 'free'
 
 ordinal_datasets = ['Wine', 'Concrete', 'Software',]
 categorical_datasets = ['AirQuality', 'Reuters', 'WisconsinBreastCancer']

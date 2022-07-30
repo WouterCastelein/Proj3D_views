@@ -71,15 +71,15 @@ def save_sphere(avp):
 def save_sphere_and_histograms(avp):
     himages = []
     myFont = ImageFont.truetype('Roboto-Regular.ttf', 200)
-    datasets = list(avp.keys())
-    datasets.sort()
-    for dataset in datasets:
-        projections = list(avp[dataset])
-        projections.sort()
-        for index, projection in enumerate(projections):
+    projections = list(avp[list(avp.keys())[0]])
+    projections.sort()
+    for projection in projections:
+        datasets = list(avp.keys())
+        datasets.sort()
+        for index, dataset in enumerate(datasets):
             images = []
             for metric in constants.metrics:
-                if index == len(avp[dataset]) - 1:
+                if index == len(datasets) - 1:
                     height = 240
                 else:
                     height = 152
@@ -99,20 +99,20 @@ def save_sphere_and_histograms(avp):
             T = hist_image.crop((54, 26 + 3 * step, 48 + 580, 26 + 4 * step))
             for im in [T, C, S, N]:
                 images.append(im.resize((int(im.width * (304 / im.height)), 304), Image.ANTIALIAS))
-            images.append(Image.new('RGB', (images[0].width * 2, images[0].height), (255, 255, 255)))
-            images = [Image.new('RGB', (images[0].width * 3 + 40, images[0].height), (255, 255, 255))] + images
+            images.append(Image.new('RGB', (images[0].width * 3 + 40, images[0].height), (255, 255, 255)))
+            images = [Image.new('RGB', (images[0].width * 2, images[0].height), (255, 255, 255))] + images
             image = get_concat_h(images[0], images[1])
             for i in range(2, len(images)):
                 image = get_concat_h(image, images[i])
 
             I1 = ImageDraw.Draw(image)
-            I1.text((sum([im.width for im in images[:len(images) - 1]]) + 40, 50), f'{projection}', font=myFont,
+            str = dataset
+            if dataset == 'WisconsinBreastCancer':
+               str = 'WBC'
+            I1.text((sum([im.width for im in images[:len(images) - 1]]) + 40, 50), f'{str}', font=myFont,
                     fill=(0, 0, 0))
             if index == 0:
-                str = dataset
-                if dataset == 'WisconsinBreastCancer':
-                    str = 'WBC'
-                I1.text((10, 20), str, font=myFont, fill=(0, 0, 0))
+                I1.text((10, 20), projection, font=myFont, fill=(0, 0, 0))
             himages.append(image)
     himages = [Image.new('RGB', (himages[0].width, images[0].height), (255, 255, 255))] + himages
     I2 = ImageDraw.Draw(himages[0])
@@ -148,10 +148,9 @@ if __name__ == '__main__':
     data_frame = parse_pickles()
     win = visualization_tool.Tool(analysis_data=data_frame)
     win.showMaximized()
-    win.box_plot_images()
-    #avp = win.available_datasets_projections()
-    #save_sphere_and_histograms(avp)
-
-    #win.save_images((0, 0))
+    #win.box_plot_images()
+    avp = win.available_datasets_projections()
+    save_sphere_and_histograms(avp)
+    # win.save_images((0, 0))
     pg.exec()
 

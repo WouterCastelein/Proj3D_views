@@ -15,6 +15,7 @@ from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QPushButton
 from pyqtgraph import mkPen
+from compute_metrics import compute_metrics
 import pyqtgraph.exporters
 
 from matplotlib import cm
@@ -379,6 +380,25 @@ class Tool(pg.GraphicsWindow):
         self.scatter_3d.update_views()
         self.sphere.update_views()
 
+    def get_bounds(self):
+        consolid_metrics = os.path.join(constants.metrics_dir, 'metrics.pkl')
+        data_frame = pd.read_pickle(consolid_metrics)
+
+        metrics_file = os.path.join(constants.metrics_dir, F'metrics_{self.dataset_name}.pkl')
+        df = pd.read_pickle(metrics_file)
+        select = df.loc[df['projection_name'] == self.projection_method]
+
+
+        views_metrics = select['views_metrics'].values
+        views_metrics = [l for l in views_metrics if len(l) > 0]
+        views_metrics = np.array([l for l in views_metrics if len(l) > 0])
+        views_metrics = views_metrics.reshape((views_metrics.shape[0] * views_metrics.shape[1], views_metrics.shape[2]))[:, 1:]
+        #direct = select[constants.metrics].to_numpy()
+        #conc = np.concatenate((views_metrics, direct))
+        mins = np.min(views_metrics, axis=0)
+        maxs = np.max(views_metrics, axis=0)
+        return mins, maxs
+
     def set_data(self, dataset_name, projection_method):
         """
         Update the data of all the widgets inside the tool to a new dataset and projection technique combination
@@ -398,6 +418,12 @@ class Tool(pg.GraphicsWindow):
         self.views_metrics = select.iloc[1]['views_metrics'][:, 1:]
         self.metrics_2d = select.iloc[0][constants.metrics].to_numpy()
         self.metrics_3d = select.iloc[1][constants.metrics].to_numpy()
+        if constants.use0_1bounds == False:
+            mins, maxs = self.get_bounds()
+            #self.views_metrics -= mins
+            self.views_metrics = (self.views_metrics - mins) / (maxs - mins)
+            self.metrics_2d = (self.metrics_2d - mins) / (maxs - mins)
+            self.metrics_3d = (self.metrics_3d - mins) / (maxs - mins)
 
         self.labels = self.get_labels()
         self.initialize_3d_scatterplot()
