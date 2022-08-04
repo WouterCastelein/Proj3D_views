@@ -380,7 +380,10 @@ class Tool(pg.GraphicsWindow):
         self.scatter_3d.update_views()
         self.sphere.update_views()
 
-    def get_bounds(self):
+    def get_bounds(self, individual_scaling=False, include_ticks=False):
+        if constants.use0_1bounds:
+            return np.zeros(4), np.ones(4)
+
         consolid_metrics = os.path.join(constants.metrics_dir, 'metrics.pkl')
         data_frame = pd.read_pickle(consolid_metrics)
 
@@ -388,13 +391,22 @@ class Tool(pg.GraphicsWindow):
         df = pd.read_pickle(metrics_file)
         select = df.loc[df['projection_name'] == self.projection_method]
 
+        if individual_scaling:
+            consolid_metrics = os.path.join(constants.metrics_dir, 'metrics.pkl')
+            data_frame = pd.read_pickle(consolid_metrics)
+        else:
+            #scale equally all 30 projections
+            metrics_file = os.path.join(constants.metrics_dir, F'metrics_{self.dataset_name}.pkl')
+            df = pd.read_pickle(metrics_file)
+            data_frame = df.loc[df['projection_name'] == self.projection_method]
 
-        views_metrics = select['views_metrics'].values
+        views_metrics = data_frame['views_metrics'].values
         views_metrics = [l for l in views_metrics if len(l) > 0]
         views_metrics = np.array([l for l in views_metrics if len(l) > 0])
         views_metrics = views_metrics.reshape((views_metrics.shape[0] * views_metrics.shape[1], views_metrics.shape[2]))[:, 1:]
-        #direct = select[constants.metrics].to_numpy()
-        #conc = np.concatenate((views_metrics, direct))
+        if include_ticks:
+            ticks = data_frame[constants.metrics].to_numpy()
+            conc = np.concatenate((views_metrics, ticks))
         mins = np.min(views_metrics, axis=0)
         maxs = np.max(views_metrics, axis=0)
         return mins, maxs
@@ -418,12 +430,11 @@ class Tool(pg.GraphicsWindow):
         self.views_metrics = select.iloc[1]['views_metrics'][:, 1:]
         self.metrics_2d = select.iloc[0][constants.metrics].to_numpy()
         self.metrics_3d = select.iloc[1][constants.metrics].to_numpy()
-        if constants.use0_1bounds == False:
-            mins, maxs = self.get_bounds()
-            #self.views_metrics -= mins
-            self.views_metrics = (self.views_metrics - mins) / (maxs - mins)
-            self.metrics_2d = (self.metrics_2d - mins) / (maxs - mins)
-            self.metrics_3d = (self.metrics_3d - mins) / (maxs - mins)
+        #mins, maxs = self.get_bounds()
+        #self.views_metrics -= mins
+        # self.views_metrics = (self.views_metrics - mins) / (maxs - mins)
+        # self.metrics_2d = (self.metrics_2d - mins) / (maxs - mins)
+        # self.metrics_3d = (self.metrics_3d - mins) / (maxs - mins)
 
         self.labels = self.get_labels()
         self.initialize_3d_scatterplot()
@@ -448,14 +459,15 @@ class Tool(pg.GraphicsWindow):
             pi = 0
         return di, pi
 
-    def save_image(self, dataset, projection):
+    def save_image(self, dataset, projection, name):
         exporter = pg.exporters.ImageExporter(self.hist.scene())
-        exporter.export(f'{constants.analysis_dir}/{dataset}-{projection}-histograms.png')
-        for metric in constants.metrics:
-            self.metric_selected(metric)
-            self.sphere.readQImage().save(f"{constants.analysis_dir}/{dataset}-{projection}-{metric}-sphere1.png")
-            self.move_to_viewpoint(-np.array(self.sphere.cameraPosition()))
-            self.sphere.readQImage().save(f"{constants.analysis_dir}/{dataset}-{projection}-{metric}-sphere2.png")
+        exporter.export(f'{constants.analysis_dir}/{dataset}-{projection}-{name}.png')
+        if constants.user_mode == 'image':
+            for metric in constants.metrics:
+                self.metric_selected(metric)
+                self.sphere.readQImage().save(f"{constants.analysis_dir}/{dataset}-{projection}-{metric}-sphere1.png")
+                self.move_to_viewpoint(-np.array(self.sphere.cameraPosition()))
+                self.sphere.readQImage().save(f"{constants.analysis_dir}/{dataset}-{projection}-{metric}-sphere2.png")
 
         # QtCore.QTimer.singleShot(100, lambda: self.sphere.readQImage().save(
         #     f"{constants.analysis_dir}/{dataset}-{projection}-sphere1.png"))
@@ -468,30 +480,35 @@ class Tool(pg.GraphicsWindow):
         dataset = list(configs.keys())[di]
         projection = list(configs[dataset])[pi]
         QtCore.QTimer.singleShot(100, lambda: self.set_data(dataset, projection))
-        QtCore.QTimer.singleShot(200, lambda: self.save_image(dataset, projection))
+        QtCore.QTimer.singleShot(200, lambda: self.save_image(dataset, projection, 'histograms'))
         QtCore.QTimer.singleShot(300, lambda: self.save_images(self.indices(di, pi)))
 
     def get_boxplot_data(self):
-        data = self.analysis_data[(self.analysis_data['dataset'] == self.dataset_name) &
-                                  (self.analysis_data['projection_method'] == self.projection_method)]
-        qualities = np.array([l for l in data['view_quality']])
-        avg_users = qualities.mean(axis=0)
-        std_users = qualities.std(axis=0)
-        min_users = qualities.min(axis=0)
-        max_users = qualities.max(axis=0)
+        data_with_tools = self.analysis_data[(self.analysis_data['dataset'] == self.dataset_name) &
+                                  (self.analysis_data['projection_method'] == self.projection_method) &
+                                  (self.analysis_data['mode'] == 'eval_full')]
+        data_without_tools = self.analysis_data[(self.analysis_data['dataset'] == self.dataset_name) &
+                                             (self.analysis_data['projection_method'] == self.projection_method) &
+                                             (self.analysis_data['mode'] == 'eval_half')]
+        qualities_with_tools  = np.array([l for l in data_with_tools['view_quality']])
+        data_without_tools = np.array([l for l in data_without_tools['view_quality']])
+        box_plot_data = []
+        for quality_lists in [self.views_metrics, data_without_tools, qualities_with_tools]:
+            box_plot_data.append([
+                quality_lists.mean(axis=0),
+                np.quantile(quality_lists, 0.25, axis=0),
+                np.quantile(quality_lists, 0.75, axis=0),
+                quality_lists.min(axis=0),
+                quality_lists.max(axis=0)
+            ])
+        return np.array(box_plot_data)
 
-        avg_overall = self.views_metrics.mean(axis=0)
-        std_overall = self.views_metrics.std(axis=0)
-        min_overall = self.views_metrics.min(axis=0)
-        max_overall = self.views_metrics.max(axis=0)
-        return avg_users, std_users, min_users, max_users, avg_overall, std_overall, min_overall, max_overall
-
-    def box_plot_images(self):
-        for config in constants.evaluation_set[1:]:
-            self.set_data(config[0], config[1])
-            self.hist.draw_box_plots()
-            return
-            # save images
+    def box_plot_images(self, index=0):
+        dataset, projection = constants.evaluation_set[1:][index]
+        self.set_data(dataset, projection)
+        self.hist.draw_box_plots()
+        QtCore.QTimer.singleShot(200, lambda: self.save_image(dataset, projection, 'boxplots2'))
+        QtCore.QTimer.singleShot(300, lambda: self.box_plot_images(index + 1))
 
 
 

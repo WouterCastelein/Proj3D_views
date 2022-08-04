@@ -1,12 +1,12 @@
 metrics = ['trustworthiness', 'continuity', 'shepard_correlation', 'normalized_stress']
 samples = 1000
 hover_to_view = True #Toggle for switching views by either hovering over bars, or clicking on bars
-
+scale_to_signal_range = False
 
 metrics_dir = 'metrics'
 output_dir = 'projections'
 analysis_dir = 'analysis'
-use0_1bounds = False
+use0_1bounds = True
 user_modes = ['free', 'eval_full', 'eval_half', 'image', 'evalimage']
 user_mode = 'free'
 
