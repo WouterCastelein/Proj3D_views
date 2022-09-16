@@ -380,9 +380,7 @@ class Tool(pg.GraphicsWindow):
         self.scatter_3d.update_views()
         self.sphere.update_views()
 
-    def get_bounds(self, individual_scaling=False, include_ticks=False):
-        if constants.use0_1bounds:
-            return np.zeros(4), np.ones(4)
+    def get_bounds(self, individual_scaling=True, include_ticks=False):
 
         consolid_metrics = os.path.join(constants.metrics_dir, 'metrics.pkl')
         data_frame = pd.read_pickle(consolid_metrics)
@@ -430,11 +428,11 @@ class Tool(pg.GraphicsWindow):
         self.views_metrics = select.iloc[1]['views_metrics'][:, 1:]
         self.metrics_2d = select.iloc[0][constants.metrics].to_numpy()
         self.metrics_3d = select.iloc[1][constants.metrics].to_numpy()
-        #mins, maxs = self.get_bounds()
+        mins, maxs = self.get_bounds()
         #self.views_metrics -= mins
-        # self.views_metrics = (self.views_metrics - mins) / (maxs - mins)
-        # self.metrics_2d = (self.metrics_2d - mins) / (maxs - mins)
-        # self.metrics_3d = (self.metrics_3d - mins) / (maxs - mins)
+        self.views_metrics = (self.views_metrics - mins) / (maxs - mins)
+        self.metrics_2d = (self.metrics_2d - mins) / (maxs - mins)
+        self.metrics_3d = (self.metrics_3d - mins) / (maxs - mins)
 
         self.labels = self.get_labels()
         self.initialize_3d_scatterplot()
@@ -509,6 +507,53 @@ class Tool(pg.GraphicsWindow):
         self.hist.draw_box_plots()
         QtCore.QTimer.singleShot(200, lambda: self.save_image(dataset, projection, 'boxplots2'))
         QtCore.QTimer.singleShot(300, lambda: self.box_plot_images(index + 1))
+
+    def get_user_selected_viewpoints(self):
+        """
+        Return a list of all viewpoint sets from the evaluation data.
+        Order: Guided 2D preference, Guided 3D preference, Blind 2D preference, Blind 3D preference
+        """
+        data = self.analysis_data.where((self.analysis_data['projection_method'] == self.projection_method) &
+                                          (self.analysis_data['dataset'] == self.dataset_name))
+        viewpoints = []
+        for mode in ['eval_full', 'eval_half']:
+            for preference in ['2D', '3D']:
+                viewpoints_sub = data.loc[(data['mode'] == mode) & (data['preference'] == preference)]['viewpoint'].to_numpy()
+                viewpoints_sub = np.array([p for p in viewpoints_sub])
+                viewpoints.append(viewpoints_sub)
+        return viewpoints
+
+    def save_snapshot(self, dataset, projection, viewpoints, i, type, preference):
+        if len(viewpoints) == i:
+            return
+        QtCore.QTimer.singleShot(10, lambda: self.move_to_viewpoint(viewpoints[i]))
+        path = f"{constants.analysis_dir}/snapshots/{type}/{preference}/{dataset}-{projection}-{i}.png"
+        utils.create_folder_for_path(path)
+        QtCore.QTimer.singleShot(20, lambda: self.scatter_3d.readQImage().save(path))
+        QtCore.QTimer.singleShot(30, lambda: self.save_snapshot(dataset, projection, viewpoints, i + 1, type, preference))
+
+    def save_user_selected_view_snapshots(self, index, set = 0):
+        dataset, projection = constants.evaluation_set[1:][index]
+        self.set_data(dataset, projection)
+
+        #Get the right viewpoint set, and save all snapshots
+        viewpoint_sets = self.get_user_selected_viewpoints()
+        type = 'guided' if set <= 1 else 'blind'
+        preference = '2D_preference' if set in [0, 2] else '3D_preference'
+        self.save_snapshot(dataset, projection, viewpoint_sets[set], 0, type, preference)
+
+        #Save snapshots of the 2D projection
+        path = f"{constants.analysis_dir}/snapshots/2D/{dataset}-{projection}.png"
+        utils.create_folder_for_path(path)
+        exporter = pg.exporters.ImageExporter(self.scatter_2d.scene())
+        exporter.export(path)
+
+        #Recursive call for the next dataset
+        if index == len(constants.evaluation_set[1:]) - 1:
+            set = set + 1
+            if set >= 4:
+                return
+        QtCore.QTimer.singleShot(5000, lambda: self.save_user_selected_view_snapshots(index + 1, set = set))
 
 
 

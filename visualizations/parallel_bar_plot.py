@@ -177,8 +177,8 @@ class parallelBarPlot(pg.PlotWidget):
                 self.addItem(item)
 
     def scale_to_signal_range(self):
-        mins = np.min(np.array([np.min(self.views_metrics, axis=0), self.metrics2d, self.metrics3d]), axis=0).reshape(1, 4)
-        maxs = np.max(np.array([np.max(self.views_metrics, axis=0), self.metrics2d, self.metrics3d]), axis=0).reshape(1, 4)
+        mins = np.min(self.views_metrics, axis=0).reshape(1, 4)
+        maxs = np.max(self.views_metrics, axis=0).reshape(1, 4)
         scale = 1 / (maxs - mins)
         self.normdata = mins, scale
         self.views_metrics = self.views_metrics - mins # mins.reshape((4,1))

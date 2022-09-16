@@ -1,4 +1,7 @@
 import numpy as np
+import os
+from pathlib import Path
+Path("/my/directory").mkdir(parents=True, exist_ok=True)
 
 def rectangular_to_spherical(points):
     #Convert rectangular coordinates (x,y,z) to spherical coordinates (Elevation, Azimuth, Distance)
@@ -8,3 +11,7 @@ def rectangular_to_spherical(points):
     spherical[:, 2] = np.sqrt(np.square(points[:, 0]) + np.square(points[:, 1]) + np.square(points[:, 2]))
     #spherical = np.roll(spherical, 0)
     return spherical
+
+def create_folder_for_path(filepath):
+    dir = os.path.dirname(filepath)
+    Path(dir).mkdir(parents=True, exist_ok=True)
