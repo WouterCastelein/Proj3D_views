@@ -6,14 +6,13 @@ import pandas as pd
 metrics = ['trustworthiness', 'continuity', 'shepard_correlation', 'normalized_stress']
 samples = 1000
 hover_to_view = True #Toggle for switching views by either hovering over bars, or clicking on bars
-scale_to_signal_range = False
-show_user_picked_viewpoints = True
+scale_to_signal_range = False #Toglle for zooming in histograms
+show_user_picked_viewpoints = False #Only works if evaluationdata is passed to the tool, (see evaluation_analysis.py)
 
 metrics_dir = 'metrics'
 output_dir = 'projections'
 analysis_dir = 'analysis'
-user_modes = ['free', 'eval_full', 'eval_half', 'image', 'evalimage']
-user_mode = 'free'
+user_mode = 'free' #options: ['free', 'eval_full', 'eval_half', 'image', 'evalimage']
 
 ordinal_datasets = ['Wine', 'Concrete', 'Software',]
 categorical_datasets = ['AirQuality', 'Reuters', 'WisconsinBreastCancer']

@@ -1,7 +1,6 @@
 import numpy as np
 import os
 from pathlib import Path
-Path("/my/directory").mkdir(parents=True, exist_ok=True)
 
 def rectangular_to_spherical(points):
     #Convert rectangular coordinates (x,y,z) to spherical coordinates (Elevation, Azimuth, Distance)
