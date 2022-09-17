@@ -4,6 +4,7 @@ from pyqtgraph.Qt import QtGui
 from pyqtgraph.opengl import shaders
 from pyqtgraph.opengl.shaders import ShaderProgram, VertexShader, FragmentShader
 
+import constants
 from visualizations.synced_camera_view_widget import SyncedCameraViewWidget
 import pyqtgraph.opengl as gl
 from matplotlib import cm
@@ -47,26 +48,32 @@ class CustomScatterItem(gl.GLScatterPlotItem):
         ])
 
 class Scatter3D(SyncedCameraViewWidget):
-    def __init__(self, data, labels, cmap, parent=None, *args, **kwargs):
+    def __init__(self, data, labels, cmap, iscategorical, parent=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.data = data - (np.max(data) - np.min(data)) / 2 #Center the data around (0,0,0)
         self.labels = labels
         self.parent = parent
         self.cmap = cmap
-        self.setCameraPosition(distance=1.8)
+        self.iscategorical = iscategorical
+        self.opts['distance'] = 110
+        #self.setCameraPosition(distance=1.8)
         self.color = np.empty((data.shape[0], 4))
         if labels is None:
             for i in range(data.shape[0]):
-                self.color[i] = self.cmap(0)
+                    self.color[i] = self.cmap(0)
         else:
             for i in range(data.shape[0]):
-                self.color[i] = self.cmap(self.labels[i])
+                if self.iscategorical:
+                    self.color[i] = self.cmap(self.labels[i])
+                else:
+                    self.color[i] = self.cmap(self.labels[i] / max(self.labels))
         sorted_indices = self.sorted_indices()
         self.scatter_item = CustomScatterItem(pos=data[sorted_indices], size=7, color=self.color[sorted_indices], pxMode=True)
         self.scatter_item.setGLOptions('translucent')
 
         self.addItem(self.scatter_item)
         self.update_order()
+
 
     def update_order(self):
         """
@@ -96,16 +103,22 @@ class Scatter3D(SyncedCameraViewWidget):
         self.update_order()
         self.parent.highlight()
 
-    def set_data(self, data, labels):
+    def set_data(self, data, labels, cmap, iscategorical):
         self.data = data - (np.max(data) - np.min(data)) / 2 #Center the data around (0,0,0)
-        self.color = np.empty((self.data.shape[0], 4))
         self.labels = labels
+        self.cmap = cmap
+        self.iscategorical = iscategorical
+        self.color = np.empty((self.data.shape[0], 4))
         if labels is None:
             for i in range(self.data.shape[0]):
                 self.color[i] = self.cmap(0)
         else:
             for i in range(self.data.shape[0]):
-                self.color[i] = self.cmap(self.labels[i])
+                if self.iscategorical:
+                    self.color[i] = self.cmap(self.labels[i])
+                else:
+                    m = max(self.labels)
+                    self.color[i] = self.cmap(self.labels[i] / m)
         sorted_indices = self.sorted_indices()
         self.scatter_item.setData(pos=self.data[sorted_indices], color=self.color[sorted_indices])
         self.on_view_change()
@@ -113,7 +126,7 @@ class Scatter3D(SyncedCameraViewWidget):
 
     def paintGL(self):
         super(Scatter3D, self).paintGL()
-        if type(self.labels) is not None:
+        if self.labels is not None:
             ulabels = np.unique(self.labels)
             painter = QPainter(self)
             font = QFont()
@@ -121,12 +134,19 @@ class Scatter3D(SyncedCameraViewWidget):
             font.setPixelSize(font_size)
             painter.setFont(font)
             painter.setPen(pg.mkPen())
-            #painter.drawRect(QRectF(self.deviceWidth() - 80, -1, 81, len(ulabels) * 1.7 * font_size))
             painter.setPen(pg.mkPen('k'))
+            alphabet = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
             for i, label in enumerate(ulabels):
-                color = self.cmap(label, bytes=True)
+                if self.iscategorical:
+                    color = self.cmap(label, bytes=True)
+                else:
+                    color = self.cmap(label / max(self.labels), bytes=True)
                 painter.setBrush(pg.mkBrush(color))
                 painter.drawEllipse(self.deviceWidth() - 3.5 * font_size, 0.5 * font_size + i * 1.7 * font_size, 0.7 * font_size, 0.7 * font_size)
-                painter.drawText(self.deviceWidth() - 2.0 * font_size, 1.2 * font_size + i * 1.7 * font_size, str(label))
+                if self.iscategorical:
+                    text = alphabet[i]
+                else:
+                    text = str(label)
+                painter.drawText(self.deviceWidth() - 2.0 * font_size, 1.2 * font_size + i * 1.7 * font_size, text)
 
 

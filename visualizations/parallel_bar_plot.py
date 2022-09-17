@@ -1,10 +1,13 @@
 from PyQt5 import QtWidgets, QtCore
 import pyqtgraph as pg
+from PyQt5.QtCore import QLine, QLineF, QRectF, QPointF
 from PyQt5.QtWidgets import QLabel
 from matplotlib import cm
 from pyqtgraph import mkPen, mkBrush
 from PyQt5.QtGui import QColor, QFont
 import numpy as np
+from pyqtgraph.Qt import QtGui
+
 import constants
 import math
 
@@ -52,12 +55,76 @@ class InteractiveRect(QtWidgets.QGraphicsRectItem):
         color.setAlpha(255 * 0.7)
         self.setBrush(pg.mkBrush(color))
 
+class ClickableText(pg.TextItem):
+    def __init__(self, parent, text="metric", *args, **kwargs):
+        super(ClickableText, self).__init__(text=text, *args, **kwargs)
+        self.setAcceptHoverEvents(True)
+        self.parent = parent
+        self.metric = text
+
+    def hoverEnterEvent(self, event):
+        c = self.color
+        c.setAlpha(255)
+        self.setColor(c)
+
+    def hoverLeaveEvent(self, event):
+        c = self.color
+        c.setAlpha(0.7 * 255)
+        self.setColor(c)
+
+    def mousePressEvent(self, event):
+        self.parent.on_metric_click(self.metric)
+
+class boxPlot(pg.GraphicsObject):
+    def __init__(self, data: np.ndarray, height, v_pos, text):
+        """
+            :param data: tuple containing boxplot data in order: [mean, 1th quantile, 3th quantile, min, max]
+        """
+        super(boxPlot, self).__init__()
+        self.data = data
+        self.height = height
+        self.v_pos = v_pos
+        self.text = text
+        self.generatePicture()
+
+    def generatePicture(self):
+        self.picture = QtGui.QPicture()
+        p = QtGui.QPainter(self.picture)
+
+        # Mean line
+        p.setPen(pg.mkPen('r', width=2))
+        p.drawLine(QLineF(self.data[0], self.v_pos - self.height / 2, self.data[0], self.v_pos + self.height / 2))
+
+        # quartile square
+        p.setPen(pg.mkPen('b', width=2))
+        p.drawRect(QRectF(self.data[1], self.v_pos - self.height / 2, self.data[2] - self.data[1], self.height))
+
+        #The rest
+        p.setPen(pg.mkPen('k', width=2))
+        p.drawLine(QLineF(self.data[3], self.v_pos, self.data[1], self.v_pos))
+        p.drawLine(QLineF(self.data[2], self.v_pos, self.data[4], self.v_pos))
+        p.drawLine(QLineF(self.data[3], self.v_pos - self.height / 4, self.data[3], self.v_pos + self.height / 4))
+        p.drawLine(QLineF(self.data[4], self.v_pos - self.height / 4, self.data[4], self.v_pos + self.height / 4))
+
+        p.end()
+
+    def paint(self, p, *args):
+        p.drawPicture(0, 0, self.picture)
+
+    def boundingRect(self):
+        return QtCore.QRectF(self.picture.boundingRect())
+
+
 class parallelBarPlot(pg.PlotWidget):
     h_gap = 1.4 #Distance between histogram plots in local coordinates
     nr_bins = 40
+    offsetY = 0
 
     def __init__(self, views_metrics, metrics2d, metrics3d, view_points, parent=None, title="Viewpoint quality histogram", *args, **kwargs):
         super().__init__(*args, **kwargs)
+        if constants.user_mode == 'evalimage':
+            self.h_gap *= 2
+            self.offsetY = 1
         self.views_metrics = views_metrics
         self.metrics2d = metrics2d
         self.metrics3d = metrics3d
@@ -67,6 +134,9 @@ class parallelBarPlot(pg.PlotWidget):
         self.label = QLabel(self.title, self.viewport())
         self.cmap = cm.get_cmap('tab10')
         self.max_points_in_bin = 0 #Defined later, and used to determine where to draw the polylines on hover
+        self.lock = False
+        if constants.user_mode == 'eval_half':
+            self.setVisible(False)
 
         #References to the poyline objects
         self.lines = None
@@ -77,7 +147,9 @@ class parallelBarPlot(pg.PlotWidget):
         self.histograms = []
         self.highlighted_rects = []
 
-        self.x_range = (0, 1) #min(np.min(views_metrics), np.min(metrics2d), np.min(metrics3d)), max(np.max(views_metrics), np.max(metrics2d), np.max(metrics3d))
+        self.x_range = (0, 1)
+        if constants.scale_to_signal_range:
+            self.scale_to_signal_range()
         for metric_index in range(self.views_metrics.shape[1]):
             hist = np.histogram(self.views_metrics[:, metric_index], self.nr_bins, range=self.x_range)
             self.max_points_in_bin = max(self.max_points_in_bin, np.max(hist[0]))
@@ -85,7 +157,6 @@ class parallelBarPlot(pg.PlotWidget):
         self.metric_texts = [] #Store references to the text items to change the metric values
         self.initialize()
         self.draw_histograms()
-
 
     def initialize(self):
         self.hideAxis('left')
@@ -95,14 +166,25 @@ class parallelBarPlot(pg.PlotWidget):
         self.getViewBox().setMouseEnabled(x=False, y=False)
 
         #Write metric names in the top left corner of each histogram
-        for metric in range(len(self.histograms)):
-            text = constants.metrics[metric]
-            item = pg.TextItem(text=text, anchor=(0, 0.5), color=pg.mkColor(self.cmap(metric, bytes=True, alpha=0.7)))
-            self.metric_texts.append(item)
-            x = self.x_range[0]
-            y = self.h_gap * metric + 0.8
-            item.setPos(x, y)
-            self.addItem(item)
+        if constants.user_mode != "image" and constants.user_mode != 'evalimage':
+            for metric in range(len(self.histograms)):
+                text = constants.metrics[metric]
+                item = ClickableText(self, text=text, anchor=(0, 0.5), color=pg.mkColor(self.cmap(metric, bytes=True, alpha=0.7)))
+                self.metric_texts.append(item)
+                x = self.x_range[0]
+                y = self.h_gap * metric + 1.1
+                item.setPos(x, y)
+                self.addItem(item)
+
+    def scale_to_signal_range(self):
+        mins = np.min(self.views_metrics, axis=0).reshape(1, 4)
+        maxs = np.max(self.views_metrics, axis=0).reshape(1, 4)
+        scale = 1 / (maxs - mins)
+        self.normdata = mins, scale
+        self.views_metrics = self.views_metrics - mins # mins.reshape((4,1))
+        self.views_metrics = self.views_metrics * scale
+        self.views_metrics = self.views_metrics.astype(float)
+        print()
 
     def draw_histograms(self):
         self.rect_reference = {}
@@ -121,26 +203,44 @@ class parallelBarPlot(pg.PlotWidget):
                     epsilon = 0.035
                 else:
                     epsilon = 0
-                rect = InteractiveRect(self, h_index, i, histogram[0][i], histogram[1][i] , self.h_gap * h_index - 0.01, widths[i], local_heights[i] + epsilon) #(x, y, width, height)
+                rect = InteractiveRect(self, h_index, i, histogram[0][i], histogram[1][i] , self.h_gap * h_index - 0.01 + self.offsetY, widths[i], local_heights[i] + epsilon) #(x, y, width, height)
                 rect.setBrush(mkBrush(color))
                 rect.setPen(self.rect_edge_pen)
                 self.addItem(rect)
                 self.rect_reference[constants.metrics[h_index]].append(rect)
 
-            #Add markers fot the quality of the 2D and 3D projection
-            line2D = QtWidgets.QGraphicsLineItem(self.metrics2d[h_index], self.h_gap * h_index -0.02, self.metrics2d[h_index],
-                                                 self.h_gap * h_index - 0.10)
-            line2D.setPen(pg.mkPen(color, width=4))
-            self.addItem(line2D)
+            if constants.user_mode == 'free':
+                #Add markers fot the quality of the 2D and 3D projection
+                line2D = QtWidgets.QGraphicsLineItem(self.metrics2d[h_index], self.h_gap * h_index -0.02 + self.offsetY, self.metrics2d[h_index],
+                                                     self.h_gap * h_index - 0.10)
+                line2D.setPen(pg.mkPen(color, width=4))
+                self.addItem(line2D)
 
-            line3D = QtWidgets.QGraphicsLineItem(self.metrics3d[h_index], self.h_gap * h_index -0.02, self.metrics3d[h_index],
-                                                 self.h_gap * h_index - 0.2)
-            line3D.setPen(pg.mkPen(color, width=4))
-            self.addItem(line3D)
+                line3D = QtWidgets.QGraphicsLineItem(self.metrics3d[h_index], self.h_gap * h_index -0.02 + self.offsetY, self.metrics3d[h_index],
+                                                     self.h_gap * h_index - 0.2)
+                line3D.setPen(pg.mkPen(color, width=4))
+                self.addItem(line3D)
 
-            self.draw_axis(h_index, (self.x_range[0], h_index * self.h_gap), (self.x_range[1], h_index * self.h_gap), 11)
+            self.draw_axis(h_index, (self.x_range[0], h_index * self.h_gap + self.offsetY), (self.x_range[1], h_index * self.h_gap + self.offsetY), 11)
+
+    def draw_box_plots(self):
+
+        box_plot_data = self.parent.get_boxplot_data()
+        if constants.scale_to_signal_range:
+            mins, scale = self.normdata
+            box_plot_data = ((box_plot_data - mins) * scale).astype(float)
+
+        for i, metric in enumerate(constants.metrics):
+            bplot_overall = boxPlot(box_plot_data[0][:, i], 0.3, self.h_gap * i - 0.3 + self.offsetY, 'overall:')
+            bplot_users_half = boxPlot(box_plot_data[1][:, i], 0.3, self.h_gap * i - 0.7 + self.offsetY, 'no tools:')
+            bplot_users_full = boxPlot(box_plot_data[2][:, i], 0.3, self.h_gap * i - 1.1 + self.offsetY, 'with tools:')
+            self.addItem(bplot_overall)
+            self.addItem(bplot_users_half)
+            self.addItem(bplot_users_full)
 
     def highlight_bar_with_values(self, metric_values):
+        if constants.user_mode in ['image', 'evalimage']:
+            return
         for rect in self.highlighted_rects:
             rect.un_highlight()
         for h_index, value in enumerate(metric_values):
@@ -152,8 +252,12 @@ class parallelBarPlot(pg.PlotWidget):
             text.setText(F"{constants.metrics[i]}: {round(metric_values[i], 2)}")
 
     def on_rect_click(self, rect, percentage):
+        if self.lock or constants.user_mode == 'evalimage':
+            return
         self.parent.move_to_view(rect.metric_index, rect.bin_index, rect.boundingRect().left(), rect.boundingRect().right(), percentage)
 
+    def on_metric_click(self, metric):
+        self.parent.metric_selected(metric)
 
     def draw_axis(self, h_index, p_bottom_left, p_bottom_right,ticks):
         """"
@@ -167,10 +271,10 @@ class parallelBarPlot(pg.PlotWidget):
         for i in range(ticks):
             x = p_bottom_left[0] + i * tick_size
             y = p_bottom_left[1]
-            if h_index == 0:
+            if h_index == 0 and constants.user_mode != 'evalimage':
                 text = str(round(self.x_range[0] + i * tick_size, 2))
                 item = pg.TextItem(text=text, anchor=(0.5, 0), color=0.6)
-                item.setPos(x, y - 0.14)
+                item.setPos(x, y - 0.14 - self.offsetY)
                 self.addItem(item)
             vline = QtWidgets.QGraphicsLineItem(x,y,x,y - 0.03)
             vline.setPen(mkPen(0.5, width=1))
@@ -185,6 +289,8 @@ class parallelBarPlot(pg.PlotWidget):
         indices : Tuple(number, number)
             The index of the currently hovered histogram/metric and the index of the specific bin that is hovered
         """
+        if self.lock:
+            return
         #unwrap indices
         h_index, b_index = indices
 

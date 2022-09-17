@@ -17,14 +17,6 @@ projection_names = {
                     'C': ['AE', 'TSNE', 'UMAP', 'FA', 'F-ICA', 'NMF', 'T-SVD'],
                     'D': ['PCA', 'I-PCA', 'S-PCA', 'K-PCA-P', 'K-PCA-R', 'K-PCA-S', 'G-RP', 'S-RP'],
                     'S': ['TSNE', 'UMAP', 'AE', 'PCA', 'MDS']
-                    # In our subset of projection techniques we aimed to include well-known techniques as well as
-                    # well-performing techniques, which resulted in the following selection:
-                    #: TSNE: Well-performing, Popular, nonlinear and focuses on local neighboordhood optimization (rather good clustering than perfect projection)
-                    #: UMAP: Well-performing, nonlinear, local and considered to be one of the best projection techniques by espadoto 2019 survey
-                    #: AE: Well-performing, Nonlinear, global technique,
-                    #: PCA: best known technique, linear, global
-                    #: MDS: another nonlinear global technique, from the well known family of multidimensional scaling techniques (http://eprints.cs.univie.ac.at/3992/4/sedlmair2013infovis.pdf)
-
                 }
 
 def get_projections(n_components):
@@ -63,8 +55,7 @@ def get_projections(n_components):
     return projections
 
 if __name__ == '__main__':
-        #dataset_name = sys.argv[1]
-    for dataset_name in ['Concrete']:
+        dataset_name = sys.argv[1]
         selection = sys.argv[2]
 
         input_file = glob('data/{0}/*-src.csv'.format(dataset_name))[0]

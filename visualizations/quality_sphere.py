@@ -1,12 +1,13 @@
-from pyqtgraph.opengl import shaders
+from OpenGL.raw.GL.VERSION.GL_1_0 import glClearColor
+from PyQt5 import QtCore
+from PyQt5.QtGui import QPainter
+import pyqtgraph as pg
 from pyqtgraph.opengl.shaders import ShaderProgram, VertexShader, FragmentShader
 
 from visualizations.synced_camera_view_widget import SyncedCameraViewWidget
 import constants
 import numpy as np
 import pyqtgraph.opengl as gl
-from scipy.spatial import ConvexHull
-
 
 class CustomMeshItem(gl.GLMeshItem):
     def __init__(self, texture_map, *args, **kwargs):
@@ -55,9 +56,10 @@ class CustomMeshItem(gl.GLMeshItem):
 class QualitySphere(SyncedCameraViewWidget):
     def __init__(self, data, cmap, parent=None, *args, **kwargs, ):
         super().__init__(*args, **kwargs)
+
         self.data = data
         self.parent = parent
-        self.setCameraPosition(distance=5)
+        self.setCameraPosition(distance=250)
         vertices = np.load(f'spheres/sphere{constants.samples}_points.npy')
         faces = np.load(f'spheres/sphere{constants.samples}_faces.npy')
         self.cmap = cmap
@@ -72,20 +74,34 @@ class QualitySphere(SyncedCameraViewWidget):
         self.md = gl.MeshData(vertexes=vertices, faces=faces, vertexColors=vertex_colors)
         self.mesh_item = CustomMeshItem(texture_1d, meshdata=self.md, smooth=True, shader='custom_shader', glOptions='translucent')
         self.addItem(self.mesh_item)
+        if constants.show_user_picked_viewpoints:
+            data = parent.analysis_data.where((parent.analysis_data['projection_method'] == parent.projection_method) &
+                                              (parent.analysis_data['dataset'] == parent.dataset_name))
+            viewpoints_with_tool =  data.loc[data['mode'] == 'eval_full']['viewpoint'].to_numpy()
+            viewpoints_with_tool = np.array([p for p in viewpoints_with_tool])
+            viewpoints_with_tool /= np.reshape(np.sqrt(np.sum(np.square(viewpoints_with_tool), axis=1)), (viewpoints_with_tool.shape[0], 1)) * 0.96
+            viewpoints_without_tool = data.loc[data['mode'] == 'eval_half']['viewpoint'].to_numpy()
+            viewpoints_without_tool = np.array([p for p in viewpoints_without_tool])
+            viewpoints_without_tool /= np.reshape(np.sqrt(np.sum(np.square(viewpoints_without_tool), axis=1)), (viewpoints_without_tool.shape[0], 1)) * 0.96
+            scatter_item = gl.GLScatterPlotItem()
+            pos = np.concatenate([viewpoints_with_tool, viewpoints_without_tool])
+            color = np.array([[1.0, 0, 0, 1.0] for p in viewpoints_with_tool] + [[0, 0, 1.0, 1.0] for p in viewpoints_without_tool])
+            scatter_item.setData(pos=pos, color=color)
+            scatter_item.setGLOptions('translucent')
+            self.addItem(scatter_item)
 
-        #Add white dot on the current viewpoint:
-        eye = self.cameraPosition()
-        eye.normalize()
-        self.scatter_item = gl.GLScatterPlotItem(pos=eye, size=5, color=(1,1,1, 1),
-                                                 pxMode=True)
-        self.scatter_item.setGLOptions('translucent')
-        self.addItem(self.scatter_item)
+    def paintGL(self):
+        if constants.user_mode == 'eval_half':
+            self.setWindowOpacity(0)
+        super(QualitySphere, self).paintGL()
 
-    def on_view_change(self):
-        super(QualitySphere, self).on_view_change()
-        self.draw_crosshair()
+        #Draw crosshair
+        painter = QPainter(self)
+        painter.setPen(pg.mkPen('k'))
+        painter.setBrush(pg.mkBrush('k'))
+        painter.drawLine(self.deviceWidth() / 2 -3, self.deviceHeight() / 2, self.deviceWidth() / 2 +3, self.deviceHeight() / 2)
+        painter.drawLine(self.deviceWidth() / 2 +0.5, self.deviceHeight() / 2 -3, self.deviceWidth() / 2 +0.5,
+                         self.deviceHeight() / 2 + 3)
 
-    def draw_crosshair(self):
-        eye = self.cameraPosition()
-        eye.normalize()
-        self.scatter_item.setData(pos=eye)
+    def save_image(self):
+        QtCore.QTimer.singleShot(1000, lambda: self.readQImage().save("fileName.png"))

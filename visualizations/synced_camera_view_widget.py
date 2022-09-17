@@ -13,19 +13,30 @@ class SyncedCameraViewWidget(gl.GLViewWidget):
         self.linked_views: List[gl.GLViewWidget] = []
         super().__init__(parent, devicePixelRatio, rotationMethod, *args, **kwds)
         self.title = title
+        self.lock = False
+        self.opts['distance'] = 100
+        self.opts['fov'] = 1
+        self.opts['elevation'] = 0
 
     def wheelEvent(self, ev):
         """Update view on zoom event"""
-        super().wheelEvent(ev)
-        self.update_views()
+        return
+
+    def pan(self, dx, dy, dz, relative='global'):
+        #disable panning
+        return
 
     def mouseMoveEvent(self, ev):
         """Update view on move event"""
+        if self.lock:
+            return
         super().mouseMoveEvent(ev)
         self.update_views()
 
     def mouseReleaseEvent(self, ev):
         """Update view on move event"""
+        if self.lock:
+            return
         super().mouseReleaseEvent(ev)
         self.update_views()
 
