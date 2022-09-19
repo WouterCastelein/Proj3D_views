@@ -6,6 +6,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 import constants
+import utils
 from metrics import (compute_distance_list, distance_list_to_matrix,
                      metric_continuity, metric_neighborhood_hit,
                      metric_normalized_stress,
@@ -37,7 +38,9 @@ def parallel_metrics(X_high, D_high_l, args):
     return [index, T_v, C_v, S_v, N_v]
 
 if __name__ == '__main__':
-    for dataset_name in ['AirQuality']:
+    datasets = set([s.split('-')[0] for s in os.listdir(constants.output_dir)])
+    #Change the definition of datasets if you don't want to compute metrics for all datasets at once.
+    for dataset_name in datasets:
         print(dataset_name)
         input_file = glob(f'data/{dataset_name}/*-src.csv')[0]
 
@@ -79,4 +82,5 @@ if __name__ == '__main__':
 
         df_metrics = pd.DataFrame.from_records(metrics_list)
         df_metrics.columns = ['projection_name', 'n_components', 'trustworthiness', 'continuity', 'shepard_correlation', 'normalized_stress', 'views_metrics']
+        utils.create_folder_for_path(metrics_file)
         df_metrics.to_pickle(metrics_file)

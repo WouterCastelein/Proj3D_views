@@ -11,6 +11,8 @@ import tapkee
 import umap
 import MulticoreTSNE
 
+import utils
+
 projection_names = {
                     'A': ['SPE', 'LPP', 'L-LTSA', 'NPE', 'L-MDS', 'DM'],
                     'B': ['LLE', 'H-LLE', 'M-LLE', 'LTSA', 'ISO', 'MDS', 'N-MDS', 'LE'],
@@ -85,4 +87,5 @@ if __name__ == '__main__':
                 df_low = pd.DataFrame(X_low)
                 df_low.columns = header[:n_components]
 
+                utils.create_folder_for_path(output_file)
                 df_low.to_csv(output_file, index=None, sep=';')
